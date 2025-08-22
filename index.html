@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>綜合傷害計算器｜玩家版 v2.2</title>
+  <style>
+    :root {
+      --fg:#0f172a; --bg:#ffffff; --sub:#64748b; --card:#f8fafc; --line:#e2e8f0;
+      --accent:#16a34a; --danger:#dc2626; --muted:#94a3b8; --warn:#f59e0b;
+    }
+    * { box-sizing:border-box; }
+    html,body { margin:0; padding:0; font-family: ui-sans-serif, system-ui, -apple-system, "PingFang TC", "Noto Sans TC", Arial; color:var(--fg); background:var(--bg); }
+    .wrap { max-width:860px; margin:0 auto; padding:14px; }
+    h1 { font-size:20px; margin:0 0 10px; }
+    h2 { font-size:16px; margin:6px 0 8px; color:#111827; }
+    .banner { background:#fffbeb; color:#78350f; border:1px solid #fde68a; border-radius:12px; padding:10px; font-size:13px; margin:10px 0; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:12px; margin:10px 0; }
+    label { display:block; font-size:12px; color:var(--sub); margin-bottom:6px; }
+    input[type="number"], input[type="text"], select {
+      width:100%; padding:12px; border:1px solid var(--line); border-radius:12px; font-size:16px; background:#fff;
+      -webkit-appearance:none; appearance:none;
+    }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .row > * { flex:1; min-width:0; }
+    .btn {
+      display:inline-block; padding:10px 14px; border-radius:12px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:14px;
+    }
+    .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .btn.danger { background:#fff; color:var(--danger); border-color:var(--danger); }
+    .kpi { display:flex; gap:10px; }
+    .kpi .box { flex:1; background:#fff; border:1px solid var(--line); border-radius:14px; padding:12px; text-align:center; }
+    .box .title { font-size:12px; color:var(--sub); margin-bottom:6px; }
+    .box .value { font-size:24px; font-weight:800; }
+    .formula { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#fff; border:1px dashed var(--line); border-radius:10px; padding:10px; font-size:13px; color:#0f172a; }
+    .muted { color:var(--muted); font-size:12px; }
+    .pill { display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:999px; background:#fff; border:1px solid var(--line); font-size:13px; cursor:pointer; }
+    .toast { position:fixed; left:50%; transform:translateX(-50%); bottom:18px; background:#111827; color:#fff; padding:10px 14px; border-radius:12px; font-size:14px; opacity:0; pointer-events:none; transition:opacity .25s ease; }
+    .toast.show { opacity:.96; }
+    .players { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+    @media (max-width:700px){ .players { grid-template-columns:1fr; } }
+    .pcard { background:#fff; border:1px solid var(--line); border-radius:16px; padding:12px; display:flex; flex-direction:column; gap:10px; }
+    .pcard .head { display:flex; align-items:center; gap:8px; justify-content:space-between; }
+    .pcard .namewrap { display:flex; gap:8px; align-items:center; flex:1; min-width:0; }
+    .toggle { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--sub); }
+    .statrow { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .actionrow { display:grid; grid-template-columns:1fr auto auto; gap:8px; }
+    .hp-dead { color:var(--danger); font-weight:700; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>綜合傷害計算器｜玩家版 v2.2</h1>
+    <div id="warn" class="banner" style="display:none;"></div>
+
+    <!-- 計算區 -->
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>攻擊（Attack）</label>
+          <input id="atk" type="number" inputmode="decimal" min="0" step="1" placeholder="例如 12">
+        </div>
+        <div>
+          <label>角色屬性倍率</label>
+          <input id="role" type="number" inputmode="decimal" min="0" step="0.1" placeholder="例如 1 或 1.5">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>屬性（聖）</label>
+          <input id="holy" type="number" inputmode="decimal" min="0" step="1" placeholder="0">
+        </div>
+        <div>
+          <label>屬性（凡）</label>
+          <input id="mortal" type="number" inputmode="decimal" min="0" step="1" placeholder="0">
+        </div>
+        <div>
+          <label>屬性（冥）</label>
+          <input id="dark" type="number" inputmode="decimal" min="0" step="1" placeholder="0">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>實／虛 卡組合倍率</label>
+          <select id="mix">
+            <option value="1">1</option>
+            <option value="5">5</option>
+            <option value="15">15</option>
+            <option value="25">25</option>
+          </select>
+        </div>
+        <div>
+          <label>人數（平均分攤）</label>
+          <input id="players" type="number" inputmode="numeric" min="1" step="1" value="1">
+          <div class="muted">輸入需要分攤的人數（例：你以外還有 3 人 → 輸入 3）。</div>
+        </div>
+      </div>
+
+      <!-- NEW: 附加總傷害 -->
+      <div class="row">
+        <div>
+          <label>附加總傷害（可正可負，會在取整前加上）</label>
+          <input id="extraTotal" type="number" inputmode="decimal" step="1" placeholder="例如 200 或 -50">
+        </div>
+      </div>
+
+      <div class="row" style="align-items:center;">
+        <div class="row" style="flex:3;">
+          <label class="pill"><input type="radio" name="round" value="none" checked>不取整</label>
+          <label class="pill"><input type="radio" name="round" value="round">四捨五入</label>
+          <label class="pill"><input type="radio" name="round" value="ceil">無條件進位</label>
+          <label class="pill"><input type="radio" name="round" value="floor">無條件捨去</label>
+        </div>
+        <div class="row" style="flex:2;">
+          <button id="reset" class="btn">清空欄位</button>
+          <button id="fillDemo" class="btn">範例數據</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 結果區 -->
+    <div class="card">
+      <div class="kpi">
+        <div class="box">
+          <div class="title">綜合傷害（取整後）</div>
+          <div id="total" class="value">0</div>
+        </div>
+        <div class="box">
+          <div class="title">每位玩家受到的傷害（平均，未套用個別減傷）</div>
+          <div id="per" class="value">0</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="formula" id="formulaText">
+          綜合傷害 ＝ 攻擊 × (聖 + 凡 + 冥) × 角色屬性 × 實／虛倍率 ＋ 附加總傷害<br>
+          → 依選擇進行取整<br>
+          每位玩家受到的傷害 ＝ 綜合傷害 ÷ 人數（個別減傷在套用時生效）
+        </div>
+      </div>
+    </div>
+
+    <!-- 玩家動作區 -->
+    <div class="card">
+      <h2>施放者與套用</h2>
+      <div class="row" style="align-items:flex-end;">
+        <div>
+          <label>我是誰</label>
+          <select id="caster"></select>
+        </div>
+        <div>
+          <label>扣血預覽</label>
+          <div class="muted">除了施放者外、在場者各扣 <span id="perPreview">0</span>（套用時依各自減傷%調整）</div>
+        </div>
+        <div>
+          <button id="apply" class="btn primary">✅ 套用傷害</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 玩家狀態 -->
+    <div class="card">
+      <h2>玩家狀態（可自訂名稱、回血、回滿、減傷）</h2>
+      <div class="players" id="playersWrap"></div>
+      <div class="row" style="margin-top:8px;">
+        <button id="healAll" class="btn">全體回滿（依各自上限）</button>
+        <button id="resetHP" class="btn danger">清空目前HP</button>
+      </div>
+    </div>
+
+    <div class="muted">資料會自動存到本機（若瀏覽器禁止 localStorage，將不會保存）。</div>
+  </div>
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const atk=$('atk'), role=$('role'), holy=$('holy'), mortal=$('mortal'), dark=$('dark');
+    const mix=$('mix'), playersN=$('players'), total=$('total'), per=$('per'), formulaText=$('formulaText');
+    const extraTotal=$('extraTotal'); // NEW
+    const resetBtn=$('reset'), fillDemo=$('fillDemo');
+    const caster=$('caster'), applyBtn=$('apply'), perPreview=$('perPreview');
+    const playersWrap=$('playersWrap'), healAll=$('healAll'), resetHP=$('resetHP');
+    const toast=$('toast'), warn=$('warn');
+
+    const LS_KEY='calc_players_v2_2'; // NEW：避免覆蓋舊版，可並存
+    const COUNT=4;
+    let STORAGE_OK=true;
+
+    function storageAvailable(){
+      try {
+        const x='__test__'+Date.now();
+        localStorage.setItem(x, x);
+        localStorage.removeItem(x);
+        return true;
+      } catch (e) { return false; }
+    }
+
+    function showWarningIfNeeded(){
+      const msgs=[];
+      if (location.protocol === 'file:') {
+        msgs.push('你是用「檔案模式 (file://)」開啟，此模式在手機上常會限制 JavaScript 或資料儲存。建議用 GitHub Pages 或任何 HTTPS 網址開啟。');
+      }
+      if (!STORAGE_OK) {
+        msgs.push('瀏覽器目前不允許 localStorage（例如 iOS 私密瀏覽）。資料將不會被保存。');
+      }
+      if (msgs.length){
+        warn.style.display='block';
+        warn.textContent = '注意：' + msgs.join(' ');
+      }
+    }
+
+    function makePlayerCard(i){
+      const div=document.createElement('div'); div.className='pcard'; div.dataset.idx=i;
+      div.innerHTML = `
+        <div class="head">
+          <div class="namewrap">
+            <input id="name${i}" type="text" placeholder="玩家${i}" value="玩家${i}" style="flex:1; min-width:0;">
+          </div>
+          <label class="toggle"><input type="checkbox" id="alive${i}" checked> 在場</label>
+        </div>
+        <div class="statrow">
+          <div><label>上限HP</label><input id="max${i}" type="number" inputmode="numeric" min="0" step="1" placeholder="可留空"></div>
+          <div><label>目前HP</label><input id="hp${i}" type="number" inputmode="decimal" min="0" step="1" placeholder="例如 1000"></div>
+        </div>
+        <div class="statrow">
+          <div><label>回血數值</label><input id="heal${i}" type="number" inputmode="decimal" min="0" step="1" placeholder="例如 200"></div>
+          <div><label>減傷(%)（0–95）</label><input id="dr${i}" type="number" inputmode="decimal" min="0" max="95" step="1" placeholder="例如 10"></div>
+        </div>
+        <div class="actionrow">
+          <div></div>
+          <button class="btn" id="healBtn${i}">+ 回血</button>
+          <button class="btn" id="fullBtn${i}">回滿</button>
+        </div>
+        <div class="muted" id="state${i}"></div>
+      `;
+      return div;
+    }
+
+    function renderPlayers(){
+      playersWrap.innerHTML='';
+      for(let i=1;i<=COUNT;i++){ playersWrap.appendChild(makePlayerCard(i)); }
+    }
+    renderPlayers();
+
+    function saveState(){
+      if(!STORAGE_OK) return;
+      try{
+        const round = document.querySelector('input[name="round"]:checked')?.value || 'none';
+        const s={
+          atk:atk.value, role:role.value, holy:holy.value, mortal:mortal.value, dark:dark.value,
+          mix:mix.value, players:playersN.value, round, caster:caster.value,
+          extraTotal: extraTotal.value || '', // NEW
+          playersData: Array.from({length:COUNT}, (_,k)=>{
+            const i=k+1;
+            return {
+              name: $('name'+i).value,
+              alive: $('alive'+i).checked,
+              max: $('max'+i).value,
+              hp: $('hp'+i).value,
+              dr: $('dr'+i).value || '' // NEW
+            };
+          })
+        };
+        localStorage.setItem(LS_KEY, JSON.stringify(s));
+      }catch(e){ /* ignore */ }
+    }
+
+    function loadState(){
+      if(!STORAGE_OK) return;
+      try{
+        const raw=localStorage.getItem(LS_KEY);
+        if(!raw) return;
+        const s=JSON.parse(raw);
+        atk.value=s.atk||''; role.value=s.role||''; holy.value=s.holy||''; mortal.value=s.mortal||''; dark.value=s.dark||'';
+        mix.value=s.mix||'1'; playersN.value=s.players||'1';
+        extraTotal.value=s.extraTotal||''; // NEW
+        if(s.round){ const r=document.querySelector(`input[name="round"][value="${s.round}"]`); if(r) r.checked=true; }
+        if(s.playersData){
+          s.playersData.forEach((pd,idx)=>{
+            const i=idx+1;
+            if(!pd) return;
+            $('name'+i).value=pd.name||`玩家${i}`;
+            $('alive'+i).checked=!!pd.alive;
+            $('max'+i).value=pd.max||'';
+            $('hp'+i).value=pd.hp||'';
+            $('dr'+i).value=pd.dr||''; // NEW
+          });
+        }
+        caster.value=s.caster||'1';
+      }catch(e){ /* ignore */ }
+    }
+
+    function updateCasterOptions(){
+      const cur = caster.value;
+      caster.innerHTML = '';
+      for(let i=1;i<=COUNT;i++){
+        const opt=document.createElement('option');
+        const nm=$('name'+i).value || `玩家${i}`;
+        opt.value=String(i); opt.textContent=nm;
+        caster.appendChild(opt);
+      }
+      if(Array.from(caster.options).some(o=>o.value===cur)) caster.value=cur;
+    }
+
+    function applyRounding(v, mode){
+      if (!isFinite(v)) return 0;
+      switch(mode){
+        case 'round': return Math.round(v);
+        case 'ceil': return Math.ceil(v);
+        case 'floor': return Math.floor(v);
+        default: return v;
+      }
+    }
+
+    function clampDR(p){
+      if(!isFinite(p)) return 0;
+      return Math.max(0, Math.min(95, p)); // NEW：上限95%
+    }
+
+    function calc(){
+      const A=parseFloat(atk.value||'0');
+      const H=parseFloat(holy.value||'0');
+      const M=parseFloat(mortal.value||'0');
+      const D=parseFloat(dark.value||'0');
+      const R=parseFloat(role.value||'0');
+      const X=parseFloat(mix.value||'1');
+      const N=Math.max(1, parseInt(playersN.value||'1',10));
+      const E=parseFloat(extraTotal.value||'0'); // NEW
+      const roundMode=document.querySelector('input[name="round"]:checked')?.value||'none';
+
+      let totalRaw=A*(H+M+D)*R*X + E; // NEW：自定總傷害加在取整前
+      let totalRounded=applyRounding(totalRaw, roundMode);
+      const perPlayer = totalRounded / N;
+
+      const fmt=(v)=> isFinite(v) ? (Math.abs(v)>=1e6 ? v.toFixed(0) : v.toLocaleString()) : '0';
+      total.textContent=fmt(totalRounded);
+      per.textContent=isFinite(perPlayer) ? perPlayer.toLocaleString(undefined,{maximumFractionDigits:2}) : '0';
+      perPreview.textContent=per.textContent;
+
+      formulaText.innerHTML=
+        `綜合傷害 ＝ ${A} × (${H} + ${M} + ${D}) × ${R} × ${X} + ${E}`+
+        `${roundMode!=='none' ? ` → 取整（${roundMode}）` : ''}<br>`+
+        `每位玩家受到的傷害 ＝ 綜合傷害 ÷ ${N}（個別減傷於套用時計入）`;
+
+      for(let i=1;i<=COUNT;i++){
+        const hp=parseFloat(($('hp'+i).value)||'0');
+        const max=parseFloat(($('max'+i).value)||'0');
+        const alive=$('alive'+i).checked;
+        const dr=clampDR(parseFloat(($('dr'+i).value)||'0')); // NEW
+        const nm = $('name'+i).value || `玩家${i}`;
+        let txt = `${nm}｜${alive?'在場':'不在場'}`;
+        if(isFinite(max) && max>0) txt += `｜上限 ${max}`;
+        txt += `｜目前 ${isFinite(hp)?hp:0}`;
+        if(dr>0) txt += `｜減傷 ${dr}%`; // NEW
+        $('state'+i).textContent = (hp<=0 && alive)? `${txt} ｜已陣亡` : txt;
+        $('state'+i).className = (hp<=0 && alive)? 'hp-dead' : 'muted';
+      }
+      updateCasterOptions();
+      saveState();
+    }
+
+    function showToast(msg){
+      toast.textContent=msg;
+      toast.classList.add('show');
+      setTimeout(()=>toast.classList.remove('show'), 1600);
+    }
+
+    function applyDamage(){
+      const casterIdx=parseInt(caster.value,10);
+      const basePer=parseFloat(per.textContent.replace(/,/g,'')) || 0;
+      if (basePer <= 0){ showToast('目前每位玩家傷害為 0'); return; }
+      const targets=[];
+      for(let i=1;i<=COUNT;i++){
+        const alive=$('alive'+i).checked;
+        if(alive && i!==casterIdx){ targets.push(i); }
+      }
+      if(targets.length===0){ showToast('沒有其他在場玩家'); return; }
+
+      targets.forEach(i=>{
+        const hpEl=$('hp'+i);
+        const oldHP=parseFloat(hpEl.value||'0');
+        const dr = clampDR(parseFloat(($('dr'+i).value)||'0'));
+        const eff = basePer * (1 - dr/100); // NEW：依個別減傷計算
+        const newHP=Math.max(0, oldHP - eff);
+        const max=parseFloat(($('max'+i).value)||'0');
+        const clipped = (isFinite(max) && max>0)? Math.min(newHP, max) : newHP;
+        // 小數保留 2 位，整數則取整
+        hpEl.value = (Number.isInteger(oldHP) && Number.isInteger(eff))
+          ? String(Math.floor(clipped))
+          : String(parseFloat(clipped.toFixed(2)));
+      });
+
+      calc();
+      const casterName = $('name'+casterIdx).value || `玩家${casterIdx}`;
+      showToast(`已套用：${casterName} 施放，${targets.length} 人各扣（依減傷%計）`);
+    }
+
+    function healOne(i){
+      const healVal=parseFloat(($('heal'+i).value)||'0');
+      if(!(healVal>0)){ showToast('請輸入要回的血量'); return; }
+      const hpEl=$('hp'+i);
+      const oldHP=parseFloat(hpEl.value||'0');
+      let newHP=oldHP + healVal;
+      const max=parseFloat(($('max'+i).value)||'0');
+      if(isFinite(max) && max>0) newHP=Math.min(newHP, max);
+      hpEl.value = Number.isInteger(oldHP) && Number.isInteger(healVal) ? String(Math.floor(newHP)) : String(parseFloat(newHP.toFixed(2)));
+      calc();
+      const nm=$('name'+i).value || `玩家${i}`;
+      showToast(`${nm} 回 ${healVal}`);
+    }
+
+    function fullOne(i){
+      const max=parseFloat(($('max'+i).value)||'0');
+      if(!(max>0)){ showToast('請先設定上限HP'); return; }
+      $('hp'+i).value=String(max);
+      calc();
+      const nm=$('name'+i).value || `玩家${i}`;
+      showToast(`${nm} 回滿至 ${max}`);
+    }
+
+    function wirePlayerControls(){
+      for(let i=1;i<=COUNT;i++){
+        ['name','alive','max','hp','heal','dr'].forEach(k=>{ // NEW：dr 綁定
+          const el=$(k+i);
+          if(el) el.addEventListener('input', calc);
+        });
+        const hb=$('healBtn'+i), fb=$('fullBtn'+i);
+        hb.addEventListener('click', ()=>healOne(i));
+        fb.addEventListener('click', ()=>fullOne(i));
+      }
+    }
+
+    resetBtn.addEventListener('click', ()=>{
+      atk.value=''; role.value=''; holy.value=''; mortal.value=''; dark.value='';
+      mix.value='1'; playersN.value='1'; extraTotal.value=''; // NEW
+      document.querySelector('input[name="round"][value="none"]').checked = true;
+      calc();
+    });
+    fillDemo.addEventListener('click', ()=>{
+      atk.value='1320'; role.value='1';
+      holy.value='2'; mortal.value='1'; dark.value='3';
+      mix.value='1'; playersN.value='3';
+      extraTotal.value='200'; // NEW
+      document.querySelector('input[name="round"][value="round"]').checked = true;
+      $('name1').value='你'; $('name2').value='阿凡'; $('name3').value='莉亞'; $('name4').value='波特';
+      $('hp1').value='2500'; $('hp2').value='1800'; $('hp3').value='1200'; $('hp4').value='3000';
+      ['alive1','alive2','alive3','alive4'].forEach(id=>$(id).checked=true);
+      ['dr1','dr2','dr3','dr4'].forEach((id,ix)=>$(id).value = ix===1? '10' : '0'); // NEW：示範玩家2減傷10%
+      caster.value='1';
+      calc();
+    });
+    applyBtn.addEventListener('click', applyDamage);
+    healAll.addEventListener('click', ()=>{
+      for(let i=1;i<=COUNT;i++){
+        const max=parseFloat(($('max'+i).value)||'0');
+        if(max>0){ $('hp'+i).value=String(max); }
+      }
+      calc(); showToast('全體回滿完成');
+    });
+    resetHP.addEventListener('click', ()=>{
+      for(let i=1;i<=COUNT;i++){ $('hp'+i).value=''; }
+      calc(); showToast('已清空目前HP');
+    });
+
+    [atk,role,holy,mortal,dark,mix,playersN,extraTotal].forEach(el=> el.addEventListener('input', calc)); // NEW：extraTotal
+    document.querySelectorAll('input[name="round"]').forEach(el => el.addEventListener('change', calc));
+    caster.addEventListener('input', calc);
+
+    // 初始化
+    STORAGE_OK = storageAvailable();
+    showWarningIfNeeded();
+    renderPlayers();
+    wirePlayerControls();
+    loadState();
+    updateCasterOptions();
+    calc();
+  </script>
+</body>
+</html>
