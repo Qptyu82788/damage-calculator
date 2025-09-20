@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>綜合傷害計算器｜本地版</title>
+  <style>
+    body{font-family:ui-sans-serif,system-ui,Arial;background:#f5f7fb;color:#0f172a;margin:0;padding:20px;}
+    h1{font-size:20px;margin-bottom:10px;}
+    .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin:10px 0;}
+    label{display:block;font-size:12px;color:#64748b;margin-bottom:4px;}
+    input,select,button{width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-bottom:8px;}
+    button{cursor:pointer;}
+    .players{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+    .pcard{border:1px solid #e2e8f0;border-radius:10px;padding:10px;background:#fff;}
+    .muted{font-size:12px;color:#94a3b8;}
+    .hp-dead{color:#dc2626;font-weight:bold;}
+    .log{background:#0b1020;color:#9ee6a6;font-family:monospace;padding:8px;border-radius:8px;height:150px;overflow-y:auto;}
+  </style>
+</head>
+<body>
+  <h1>⚔️ 綜合傷害計算器（本地版）</h1>
+
+  <!-- 輸入區 -->
+  <div class="card">
+    <label>攻擊</label><input id="atk" type="number" placeholder="例如 1200">
+    <label>倍率</label><input id="rate" type="number" placeholder="例如 1.5" value="1">
+    <label>人數</label><input id="playersCount" type="number" value="1" min="1">
+    <label>附加傷害</label><input id="extra" type="number" value="0">
+  </div>
+
+  <!-- 結果區 -->
+  <div class="card">
+    <div>綜合傷害：<span id="total">0</span></div>
+    <div>每位玩家平均：<span id="per">0</span></div>
+  </div>
+
+  <!-- 施放者 -->
+  <div class="card">
+    <label>我是誰</label>
+    <select id="caster"></select>
+    <button id="apply">套用傷害</button>
+    <div class="muted">扣血公式：max(0, floor(基礎傷害×(1-減傷%) - 減傷數值))</div>
+  </div>
+
+  <!-- 玩家區 -->
+  <div class="card">
+    <h3>玩家狀態</h3>
+    <div class="players" id="playersWrap"></div>
+  </div>
+
+  <!-- 紀錄 -->
+  <div class="card">
+    <h3>紀錄</h3>
+    <div class="log" id="log"></div>
+  </div>
+
+<script>
+const $=id=>document.getElementById(id);
+const atk=$('atk'),rate=$('rate'),extra=$('extra'),playersCount=$('playersCount');
+const total=$('total'),per=$('per'),caster=$('caster'),applyBtn=$('apply');
+const playersWrap=$('playersWrap'),logBox=$('log');
+
+let players=[
+  {name:"玩家一",hp:2000,max:2000,dr:0,drFlat:0,active:true,heal:200},
+  {name:"玩家二",hp:2000,max:2000,dr:0,drFlat:0,active:true,heal:200},
+  {name:"玩家三",hp:2000,max:2000,dr:0,drFlat:0,active:true,heal:200},
+  {name:"玩家四",hp:2000,max:2000,dr:0,drFlat:0,active:true,heal:200}
+];
+
+function log(msg){
+  logBox.innerHTML+=msg+"<br>";
+  logBox.scrollTop=logBox.scrollHeight;
+}
+
+function calc(){
+  const A=parseFloat(atk.value)||0;
+  const R=parseFloat(rate.value)||1;
+  const E=parseFloat(extra.value)||0;
+  const N=Math.max(1,parseInt(playersCount.value)||1);
+  const totalRaw=A*R+E;
+  const perPlayer=totalRaw/N;
+  total.textContent=Math.floor(totalRaw);
+  per.textContent=perPlayer.toFixed(2);
+  updateCaster();
+}
+function updateCaster(){
+  const cur=caster.value;
+  caster.innerHTML='';
+  players.forEach((p,i)=>{
+    const opt=document.createElement('option');
+    opt.value=i;opt.textContent=p.name;
+    caster.appendChild(opt);
+  });
+  if(cur) caster.value=cur;
+}
+function applyDamage(){
+  const basePer=parseFloat(per.textContent)||0;
+  const casterIdx=parseInt(caster.value)||0;
+  players.forEach((p,i)=>{
+    if(i===casterIdx||!p.active) return;
+    const dmg=Math.max(0,Math.floor(basePer*(1-p.dr/100)-p.drFlat));
+    p.hp=Math.max(0,p.hp-dmg);
+    log(`${p.name} 扣 ${dmg}（減傷${p.dr}% + ${p.drFlat}）→ ${p.hp}/${p.max}`);
+  });
+  renderPlayers();
+}
+function renderPlayers(){
+  playersWrap.innerHTML='';
+  players.forEach((p,i)=>{
+    const div=document.createElement('div');
+    div.className='pcard';
+    div.innerHTML=`
+      <label>名稱</label><input value="${p.name}" onchange="players[${i}].name=this.value;renderPlayers();">
+      <div>${p.hp}/${p.max} ${p.active?'在場':'不在場'}</div>
+      <label>最大HP</label><input type="number" value="${p.max}" onchange="players[${i}].max=+this.value;renderPlayers();">
+      <label>目前HP</label><input type="number" value="${p.hp}" onchange="players[${i}].hp=+this.value;renderPlayers();">
+      <label>減傷%</label><input type="number" value="${p.dr}" onchange="players[${i}].dr=+this.value;renderPlayers();">
+      <label>減傷數值</label><input type="number" value="${p.drFlat}" onchange="players[${i}].drFlat=+this.value;renderPlayers();">
+      <label>回血值</label><input type="number" value="${p.heal}" onchange="players[${i}].heal=+this.value;">
+      <button onclick="players[${i}].hp=Math.min(players[${i}].max,players[${i}].hp+players[${i}].heal);renderPlayers();log('${p.name} 回 ${p.heal}')">回復</button>
+      <button onclick="players[${i}].hp=players[${i}].max;renderPlayers();log('${p.name} 回滿')">回滿</button>
+      <label>在場 <input type="checkbox" ${p.active?'checked':''} onchange="players[${i}].active=this.checked;renderPlayers();"></label>
+    `;
+    if(p.hp<=0&&p.active) div.innerHTML+=`<div class='hp-dead'>已陣亡</div>`;
+    playersWrap.appendChild(div);
+  });
+  updateCaster();
+}
+
+[atk,rate,extra,playersCount].forEach(el=>el.addEventListener('input',calc));
+applyBtn.addEventListener('click',applyDamage);
+
+renderPlayers();
+calc();
+</script>
+</body>
+</html>
+
